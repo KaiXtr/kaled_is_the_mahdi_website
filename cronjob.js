@@ -30,7 +30,7 @@ app.use(express.static("public"));
   //Obter parágrafos do capítulo
   for (let cc of livroFilhos){
     console.log("Buscando capítulo",cc.name);
-    capObj = {
+    capitulo = {
       id: cc.id,
       name: cc.name,
       conteudo: []
@@ -59,9 +59,9 @@ app.use(express.static("public"));
             verso = "_" + verso + "_";
           }
           //Adicionar numeração
-          //verso = (index + lastInd + 1).toString() + ". " + verso;
+          verso = (index + lastInd + 1).toString() + ". " + verso;
 
-          capObj.conteudo.push(verso)
+          capitulo.conteudo.push(verso)
         }
       })
 
@@ -73,20 +73,61 @@ app.use(express.static("public"));
         lastIt = "end"
       }
     }
-    capitulos.push(capObj);
-  }
+    capitulos.push(capitulo);
 
-  //Criar arquivo HTML
-  let doc = "<ol>";
-  for (let t of capitulos[1].conteudo){
-    txt = t;
-    doc += "<li>" + txt + "</li>\n";
-  }
-  doc += "</ol>"
-
-  fs.writeFile("teste.html",doc, err => {
-    if (err) {
-      console.error(err);
+    //Criar documento HTML para cada capítulo
+    let doc = "<h2>" + capitulo.name + "</h2>\n";
+    for (let t of capitulo.conteudo){
+      txt = "";
+  
+      bTag = false;
+      iTag = false;
+      
+      //Formatar de acordo com negrito e/ou itálico
+      for (let caractere = 0;caractere<t.length;caractere++) {
+        if (t.charAt(caractere) == '*'){
+          if (bTag){
+            txt += "</b>";
+            bTag = false;
+          }else {
+            txt += "<b>";
+            bTag = true;
+          }
+        }else if (t.charAt(caractere) == '_'){
+          if (iTag){
+            txt += "</i>";
+            iTag = false;
+          }else {
+            txt += "<i>";
+            iTag = true;
+          }
+        }else {
+          txt += t.charAt(caractere);
+        }
+      }
+      doc += "        <p>" + txt + "</p>\n";
     }
-  })
+    
+    //Criar arquivo HTML
+    let cpNome = capitulo.name.toLowerCase();
+    cpNome = cpNome.replace(". ","-");
+    cpNome = cpNome.replace(" ","-");
+    cpContent = "";
+
+    //Adicionar informações do template ao documento
+    headerData = fs.readFileSync('templates/header.html', 'utf8');
+    footerData = fs.readFileSync('templates/footer.html', 'utf8');
+    cpContent += headerData + doc + footerData;
+
+    //Recriar os capítulos para cada idioma
+    const idiomas = ["pt","en","es","ar"];
+    idiomas.forEach(idioma => {
+      fs.writeFile("src/" + idioma + "/" + cpNome + ".html",cpContent, err => {
+        if (err) {
+          console.error(err);
+        }
+      })
+    })
+  }
+
 })();
