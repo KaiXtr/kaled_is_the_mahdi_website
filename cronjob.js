@@ -47,7 +47,9 @@ app.use(express.static("public"));
       });
   
       //Colocar versos do capítulo dentro de objeto.
-      cap.results.forEach((element, index) => {
+      let index = 0;
+      let skip = 0;
+      cap.results.forEach(element => {
         if ((index < 99) && ('numbered_list_item' in element)) {
           let verso = element.numbered_list_item.rich_text[0].plain_text;
           
@@ -62,13 +64,16 @@ app.use(express.static("public"));
           verso = (index + lastInd + 1).toString() + ". " + verso;
 
           capitulo.conteudo.push(verso)
+          index++;
+        }else {
+          skip++;
         }
       })
 
       //Se tiver mais versos do que o que a API pôde retornar, mandar consultar de novo
       if (cap.results.length >= 100) {
-        lastInd += cap.results.length - 1;
-        lastIt = cap.results[cap.results.length - 1].id;
+        lastInd += index;
+        lastIt = cap.results[index + skip - 1].id;
       }else {
         lastIt = "end"
       }
