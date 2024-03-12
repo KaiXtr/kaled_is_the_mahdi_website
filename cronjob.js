@@ -1,13 +1,9 @@
 require("dotenv").config();
-
+const { translate } = require('google-translate-api-browser');
 const fs = require("fs");
-const express = require("express");
-const app = express();
 
 const { Client } = require("@notionhq/client");
 const notion = new Client({ auth: process.env.NOTION_KEY });
-
-app.use(express.static("public"));
 
 (async () => {
   const livroFilhos = [];
@@ -81,7 +77,20 @@ app.use(express.static("public"));
     capitulos.push(capitulo);
 
     //Criar documento HTML para cada capítulo
-    let doc = "<h2>" + capitulo.name + "</h2>\n";
+    const idiomas = ["pt"]//,"en","es","ar"];
+    const traducoes = [];
+    idiomas.forEach(idioma => {
+      if (idioma != 'pt') {
+        translate(capitulo.name, {to: idioma}).then(res => {
+          traducoes.push("<h2>" + res.text + "</h2>\n");
+        }).catch(err => {
+            console.error(err);
+        });
+      }else {
+        traducoes.push("<h2>" + capitulo.name + "</h2>\n")
+      }
+    })
+
     for (let t of capitulo.conteudo){
       txt = "";
   
@@ -110,7 +119,19 @@ app.use(express.static("public"));
           txt += t.charAt(caractere);
         }
       }
-      doc += "        <p>" + txt + "</p>\n";
+      //Traduzir cada verso
+      for (let i=0;i<idiomas.length;i++) {
+        if (idiomas[i] != 'pt') {
+          translate(txt, {to: idiomas[i]}).then(res => {
+              console.log(res);
+              traducoes[i] += "        <p>" + res.text + "</p>\n";
+          }).catch(err => {
+              console.error(err);
+          });
+        }else {
+          traducoes[i] += "        <p>" + txt + "</p>\n";
+        }
+      }
     }
     
     //Criar arquivo HTML
@@ -122,17 +143,16 @@ app.use(express.static("public"));
     //Adicionar informações do template ao documento
     headerData = fs.readFileSync('templates/header.html', 'utf8');
     footerData = fs.readFileSync('templates/footer.html', 'utf8');
-    cpContent += headerData + doc + footerData;
 
     //Recriar os capítulos para cada idioma
-    const idiomas = ["pt","en","es","ar"];
-    idiomas.forEach(idioma => {
-      fs.writeFile("src/" + idioma + "/" + cpNome + ".html",cpContent, err => {
+    for (let i=0;i<idiomas.length;i++) {
+      cpContent += headerData + traducoes[i] + footerData;
+      fs.writeFile("src/" + idiomas[i] + "/" + cpNome + ".html",cpContent, err => {
         if (err) {
           console.error(err);
         }
       })
-    })
+    }
   }
 
 })();
