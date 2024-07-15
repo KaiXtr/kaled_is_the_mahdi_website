@@ -1,13 +1,36 @@
 require("dotenv").config();
 const { translate } = require('google-translate-api-browser');
 const fs = require("fs");
+const Wattpad = require('wattpad.js')
+const w = new Wattpad();
 
 const { Client } = require("@notionhq/client");
 const notion = new Client({ auth: process.env.NOTION_KEY });
 
+function nomeCapitulo(nome) {
+  let cpNome = nome.toLowerCase();
+  cpNome = cpNome.replace(". ","-");
+  cpNome = cpNome.replace(" ","-");
+  return cpNome;
+}
+
 (async () => {
   const livroFilhos = [];
   const capitulos = [];
+  const imagens = [];
+
+  await w.Stories.detail("360139746").then(res => {
+    res.parts.forEach(part => {
+      if (part.photoUrl == '') {
+        imagens.push('../media/bg.jpg');
+      }else {
+        imagens.push(part.photoUrl);
+      }
+    })
+    console.log(res.voteCount)
+    console.log(res.readCount)
+    console.log(res.commentCount)
+  })
 
   //Obter capítulos do livro
   const livro = await notion.blocks.children.list({
@@ -23,13 +46,30 @@ const notion = new Client({ auth: process.env.NOTION_KEY });
     }
   })
 
+  //Criar sumário de capítulos
+  let capList = ""
+  let sumList = []
+  for (let cc=0;cc<livroFilhos.length;cc++){
+    let capLink = `src/pt/${nomeCapitulo(livroFilhos[cc].name)}.html`
+    capList += `<li><a href="${capLink}">${livroFilhos[cc].name}</a></li>`
+    sumList.push(livroFilhos[cc].name)
+  }
+  indexData = fs.readFileSync('templates/index.html', 'utf8');
+  indexData = indexData.replace("{{capList}}",capList);
+  fs.writeFile('index.html',indexData, err => {
+    if (err) {
+      console.error(err);
+    }
+  })
+
   //Obter parágrafos do capítulo
-  for (let cc of livroFilhos){
-    console.log("Buscando capítulo",cc.name);
+  for (let cc=0;cc<livroFilhos.length;cc++){
+    console.log("Buscando capítulo",livroFilhos[cc].name);
     capitulo = {
-      id: cc.id,
-      name: cc.name,
-      conteudo: []
+      id: livroFilhos[cc].id,
+      name: livroFilhos[cc].name,
+      conteudo: [],
+      imagem: imagens[cc + 3]
     }
     lastIt = undefined;
     lastInd = 0;
@@ -37,7 +77,7 @@ const notion = new Client({ auth: process.env.NOTION_KEY });
     //Obter páginas dos capítulos
     while (lastIt != "end" ){
       const cap = await notion.blocks.children.list({
-        block_id: cc.id,
+        block_id: livroFilhos[cc].id,
         start_cursor: lastIt,
         page_size: 100,
       });
@@ -135,19 +175,46 @@ const notion = new Client({ auth: process.env.NOTION_KEY });
     }
     
     //Criar arquivo HTML
-    let cpNome = capitulo.name.toLowerCase();
-    cpNome = cpNome.replace(". ","-");
-    cpNome = cpNome.replace(" ","-");
+    let cpNome = nomeCapitulo(capitulo.name);
     cpContent = "";
 
     //Adicionar informações do template ao documento
     headerData = fs.readFileSync('templates/header.html', 'utf8');
+    headerData = headerData.replace("{{pagTitulo}}",capitulo.name);
+    headerData = headerData.replace("{{pagImg}}", '../media/bg.jpg');//capitulo.imagem);
     footerData = fs.readFileSync('templates/footer.html', 'utf8');
+
+    //Adicionar link para página anterior
+    if (cc > 0)
+      footerData = footerData.replace(
+        "{{pagAnter}}",
+        `<a href="pt/${nomeCapitulo(livroFilhos[cc - 1].name)}.html">Página anterior</a>`)
+    else
+      footerData = footerData.replace("{{pagAnter}}",'')
+    
+    //Adicionar link para a próxima página
+    if (cc < livroFilhos.length - 1)
+      footerData = footerData.replace(
+        "{{proxPag}}",
+        `<a href="pt/${nomeCapitulo(livroFilhos[cc + 1].name)}.html">Próxima página</a>`)
+    else
+      footerData = footerData.replace("{{proxPag}}",'')
+
+    //Adicionando sumário de capítulos
+    let sumTxt = ""
+    for (let ss=0;ss<sumList.length;ss++){
+      let capLink = `pt/${nomeCapitulo(sumList[ss])}.html`
+      if (livroFilhos[cc].name == sumList[ss])
+        sumTxt += `<li><b>-> <a href="${capLink}">${sumList[ss]}</a> <-</b></li>`
+      else
+        sumTxt += `<li><a href="${capLink}">${sumList[ss]}</a></li>`
+    }
+    footerData = footerData.replace("{{sumList}}",sumTxt);
 
     //Recriar os capítulos para cada idioma
     for (let i=0;i<idiomas.length;i++) {
       cpContent += headerData + traducoes[i] + footerData;
-      fs.writeFile("src/" + idiomas[i] + "/" + cpNome + ".html",cpContent, err => {
+      fs.writeFile(`src/${idiomas[i]}/${cpNome}.html`,cpContent, err => {
         if (err) {
           console.error(err);
         }

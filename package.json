@@ -4,6 +4,7 @@
     "@notionhq/client": "^2.2.14",
     "dotenv": "^16.4.5",
     "fs": "^0.0.1-security",
-    "google-translate-api-browser": "^4.3.2"
+    "google-translate-api-browser": "^4.3.2",
+    "wattpad.js": "^0.0.22"
   }
 }
