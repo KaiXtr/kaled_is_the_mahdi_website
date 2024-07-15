@@ -155,6 +155,8 @@ function nomeCapitulo(nome) {
             txt += "<i>";
             iTag = true;
           }
+        }else if (t.charAt(caractere) == '\n'){
+          txt += "<br />";
         }else {
           txt += t.charAt(caractere);
         }
